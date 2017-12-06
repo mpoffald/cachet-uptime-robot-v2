@@ -17,11 +17,11 @@ class UptimeRobot(object):
         self.base_url = 'https://api.uptimerobot.com/v2/getMonitors'
         self.authuser = authuser
         self.authpass = authpass
-    def get_monitors(self, response_times=1, logs=1, uptime_ratio=30):
+    def get_monitors(self, response_times=0, logs=1, uptime_ratio=30):
         """
         Returns status and response payload for all known monitors.
         """
-        print('GET MONITORS')
+
         endpoint = self.base_url
         data = {
                 'api_key': format(self.api_key),
@@ -84,7 +84,8 @@ class CachetHq(object):
 
     def update_component(self, id_component=1, status=None):
         component_status = None
-
+        old_component_status = self.get_last_component_status(id_component) 
+        
         # Not Checked yet and Up
         if status in [self.UPTIME_ROBOT_NOT_CHECKED_YET, self.UPTIME_ROBOT_UP]:
             component_status = self.CACHET_OPERATIONAL
@@ -96,8 +97,11 @@ class CachetHq(object):
         # Down
         elif status == self.UPTIME_ROBOT_DOWN:
             component_status = self.CACHET_DOWN
-        print('UPDATE COMPONENT')
-        if component_status:
+
+
+        print('Old component status for component ' + str(id_component) + ': ' + str(old_component_status) + ', new component status: ' + str(component_status))
+        if ((component_status and old_component_status) and (component_status != old_component_status)):
+            print('There has been a change in component status for component ' + str(id_component))
             url = '{0}/api/v1/{1}/{2}'.format(
                 self.cachet_url,
                 'components',
@@ -109,100 +113,52 @@ class CachetHq(object):
             }
 
             headers={'X-Cachet-Token': self.cachet_api_key}
-            '''
-            req = request.Request(
-                url=url,
-                data=data,
-                method='PUT',
-                headers={'X-Cachet-Token': self.cachet_api_key},
 
-            )
-            '''
             response = requests.request('PUT', url, data=data, headers=headers, auth=(self.authuser, self.authpass))
-            print('REQUEST MADE')
-#            response = request.urlopen(req)
-#            content = response.read().decode('utf-8')
-            print('update compnent complete')
- #           return content
+
             return response
+        
+        print('No change to component status for component ' + str(id_component))
+        
 
     def set_data_metrics(self, value, timestamp, id_metric=1):
-        print('SET DATA METRICS')
+
         url = '{0}/api/v1/metrics/{1}/points'.format(
             self.cachet_url,
             id_metric
         )
 
-        print("metric url (should be 2): " + str(url))
-#        data = OAparse.urlencode({
+
+
         data = {
             'value': value,
             'timestamp': timestamp,
         }
-        '''
-        req = request.Request(
-            url=url,
-            data=data,
-            method='POST',
-            headers={'X-Cachet-Token': self.cachet_api_key},
-        )
-        '''
+
         headers={'X-Cachet-Token': self.cachet_api_key}
         
         response = requests.request('POST', url, data=data, headers=headers, auth=(self.authuser, self.authpass))
         
-        print('response in set_data_metrics: ' + str(response))
- #       return json.loads(response.read().decode('utf-8'))
+
         return response.json()
 
-    def get_last_metric_point(self, id_metric):
-        print('GET LAST METRIC POINT')
-        url = '{0}/api/v1/metrics/{1}/points'.format(
+    def get_last_component_status(self, id_component):
+
+        url = '{0}/api/v1/{1}/{2}'.format(
             self.cachet_url,
-            id_metric
+            'components',
+            id_component
         )
 
-        req = request.Request(
-            url=url,
-            method='GET',
-            headers={'X-Cachet-Token': self.cachet_api_key},
-        )
+        response = requests.request('GET', url, auth=(self.authuser, self.authpass))
 
-        req.auth = self.auth
-        response = request.urlopen(req)
-        content = response.read().decode('utf-8')
-
-        last_page = json.loads(
-            content
-        ).get('meta').get('pagination').get('total_pages')
-
-        url = '{0}/api/v1/metrics/{1}/points?page={2}'.format(
-            self.cachet_url,
-            id_metric,
-            last_page
-        )
-
-        req = request.Request(
-            url=url,
-            method='GET',
-            headers={'X-Cachet-Token': self.cachet_api_key},
-        )
-
-        req.auth=self.auth
-        response = request.urlopen(req)
-        content = response.read().decode('utf-8')
-
-        if json.loads(content).get('data'):
-            data = json.loads(content).get('data')[0]
-        else:
-            data = {
-                'created_at': datetime.now().date().strftime(
-                    '%Y-%m-%d %H:%M:%S'
-                )
-            }
-
-        return data
-
+        j_response = response.json()
+        
+        old_status = j_response["data"]["status"]
+        
+        return old_status
+        
+        
 
 class Monitor(object):
     def __init__(self, monitor_list, api_key, authuser, authpass):
@@ -293,3 +249,5 @@ if __name__ == "__main__":
 
     MONITOR = Monitor(monitor_list=MONITOR_DICT, api_key=uptime_robot_api_key, authuser=authuser, authpass=authpass)
     MONITOR.update()
+    now = datetime.now()
+    print('finished all updates at ' + str(now))
