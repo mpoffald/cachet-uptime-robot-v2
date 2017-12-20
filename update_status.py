@@ -4,7 +4,7 @@ import sys
 import time
 import configparser
 from urllib import request
-from urllib import parse ##updating to requests library
+from urllib import parse 
 import requests
 from datetime import datetime
 
@@ -12,12 +12,12 @@ from datetime import datetime
 class UptimeRobot(object):
     """ Intermediate class for setting uptime stats.
     """
-    def __init__(self, api_key, authuser, authpass):
+    def __init__(self, api_key):
         self.api_key = api_key
         self.base_url = 'https://api.uptimerobot.com/v2/getMonitors'
-        self.authuser = authuser
-        self.authpass = authpass
-    def get_monitors(self, response_times=0, logs=1, uptime_ratio=30):
+
+
+    def get_monitors(self, response_times=1, logs=1, uptime_ratio=30):
         """
         Returns status and response payload for all known monitors.
         """
@@ -28,7 +28,7 @@ class UptimeRobot(object):
                 'format': 'json',
                 # responseTimes - optional (defines if the response time data of each
                 # monitor will be returned. Should be set to 1 for getting them.
-                # Default is 0)
+                # Default is 1)
                 'response_times': format(response_times),
                  # logs - optional (defines if the logs of each monitor will be
                 # returned. Should be set to 1 for getting the logs. Default is 0)
@@ -37,15 +37,15 @@ class UptimeRobot(object):
                 # the uptime ratio(s) for. Ex: customUptimeRatio=7-30-45 to get the
                 # uptime ratios for those periods)
                 'custom_uptime_ratios': format(uptime_ratio)
-            } ##NOTE used to be encoding here 
+            }  
 
 
-        
+ 
         headers={'content-type': "application/x-www-form-urlencoded",'cache-control': "no-cache"}
 
         # Verifying in the response is jsonp in otherwise is error
 
-        response = requests.request('POST', endpoint, data=data, headers=headers, auth=(authuser, authpass))
+        response = requests.request('POST', endpoint, data=data, headers=headers)
 
     
 
@@ -79,7 +79,7 @@ class CachetHq(object):
         self.cachet_api_key = cachet_api_key
         self.cachet_url = cachet_url
         self.authuser = authuser
-        self.authpass = authpass #request does not have "auth", try switching to requests (import requests and maybe update query syntax)
+        self.authpass = authpass 
 
 
     def update_component(self, id_component=1, status=None):
@@ -167,10 +167,12 @@ class Monitor(object):
         self.authuser = authuser
         self.authpass = authpass
 
+
     def send_data_to_catchet(self, monitor):
         """ Posts data to Cachet API.
             Data sent is the value of last `Uptime`.
         """
+
         try:
             website_config = self.monitor_list[monitor.get('url')]
         except KeyError:
@@ -200,10 +202,12 @@ class Monitor(object):
     def update(self):
         """ Update all monitors uptime and status.
         """
-        uptime_robot = UptimeRobot(self.api_key, self.authuser, self.authpass)
+        uptime_robot = UptimeRobot(self.api_key)
         success, response = uptime_robot.get_monitors(response_times=1)
+
         if success:
             monitors = response.get('monitors')
+
             for monitor in monitors:
                 if monitor['url'] in self.monitor_list:
                     print('Updating monitor {0}. URL: {1}. ID: {2}'.format(
@@ -227,6 +231,8 @@ if __name__ == "__main__":
 
     UPTIME_ROBOT_API_KEY = None
     MONITOR_DICT = {}
+    authuser = None
+    authpass  = None
     for section in SECTIONS:
         if section == 'uptimeRobot':
             uptime_robot_api_key = CONFIG[section]['UptimeRobotMainApiKey']
@@ -242,8 +248,6 @@ if __name__ == "__main__":
             if 'ComponentId' in CONFIG[section]:
                 MONITOR_DICT[section].update({
                     'component_id': CONFIG[section]['ComponentId'],
-#                    'authuser':CONFIG[element]['Authuser'],
-#                    'authpass':CONFIG[element]['Authpass'],
                 })
         
 
