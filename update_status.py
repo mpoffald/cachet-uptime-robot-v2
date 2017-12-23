@@ -97,11 +97,11 @@ class CachetHq(object):
         # Down
         elif status == self.UPTIME_ROBOT_DOWN:
             component_status = self.CACHET_DOWN
+    
 
-
-        print('Old component status for component ' + str(id_component) + ': ' + str(old_component_status) + ', new component status: ' + str(component_status))
+        print('  Old component status: {0}, new status: {1}'.format(old_component_status, component_status))
         if ((component_status and old_component_status) and (component_status != old_component_status)):
-            print('There has been a change in component status for component ' + str(id_component))
+            print('     Note: There has been a change in status for this component')
             url = '{0}/api/v1/{1}/{2}'.format(
                 self.cachet_url,
                 'components',
@@ -118,17 +118,22 @@ class CachetHq(object):
 
             return response
         
-        print('No change to component status for component ' + str(id_component))
+        print('     No change to status for this component')
         
 
-    def set_data_metrics(self, value, timestamp, id_metric=1):
+    def set_data_metrics(self, data, id_metric=1, is_last_response_time=False):
 
         url = '{0}/api/v1/metrics/{1}/points'.format(
             self.cachet_url,
             id_metric
         )
-
-
+        
+        if is_last_response_time: ##rearrange for Cachet
+            value = data.get('value')
+            timestamp = data.get('datetime')
+        else:
+            value = data
+            timestamp = int(time.time())
 
         data = {
             'value': value,
@@ -170,7 +175,7 @@ class Monitor(object):
 
     def send_data_to_catchet(self, monitor):
         """ Posts data to Cachet API.
-            Data sent is the value of last `Uptime`.
+            Data sent is the value of last `response_time`.
         """
 
         try:
@@ -191,16 +196,38 @@ class Monitor(object):
                 website_config['component_id'],
                 int(monitor.get('status'))
             )
+        metric_type =int( website_config['metric_type'])
+        metric_id = website_config['metric_id']
+        
+        if metric_type == 0:
+            metric = cachet.set_data_metrics(
+                monitor.get('response_times')[0], 
+                metric_id,
+                True
+            )
+            print('  Metric created: {0}'.format(metric))
+        elif metric_type == 1 :
+            metric = cachet.set_data_metrics(
+                monitor.get('average_response_time'), 
+                metric_id,
+                False
+            )
+            print('  Metric created: {0}'.format(metric))
+        elif metric_type == 2:
+            metric = cachet.set_data_metrics(
+                monitor.get('custom_uptime_ratio'), 
+                metric_id,
+                False
+            )
+            print('  Metric created: {0}'.format(metric))
+        else:
+            print('ERROR: Metric type \"{0}\" not supported'.format(metric_type))
+            
+        
 
-        metric = cachet.set_data_metrics(
-            monitor.get('custom_uptime_ratio'),
-            int(time.time()),
-            website_config['metric_id']
-        )
-        print('Metric created: {0}'.format(metric))
 
     def update(self):
-        """ Update all monitors uptime and status.
+        """ Update all monitors response time and status.
         """
         uptime_robot = UptimeRobot(self.api_key)
         success, response = uptime_robot.get_monitors(response_times=1)
@@ -244,6 +271,7 @@ if __name__ == "__main__":
                 'cachet_api_key': CONFIG[section]['CachetApiKey'],
                 'cachet_url': CONFIG[section]['CachetUrl'],
                 'metric_id': CONFIG[section]['MetricId'],
+                'metric_type':CONFIG[section]['MetricType'],
             }
             if 'ComponentId' in CONFIG[section]:
                 MONITOR_DICT[section].update({
@@ -254,4 +282,4 @@ if __name__ == "__main__":
     MONITOR = Monitor(monitor_list=MONITOR_DICT, api_key=uptime_robot_api_key, authuser=authuser, authpass=authpass)
     MONITOR.update()
     now = datetime.now()
-    print('finished all updates at ' + str(now))
+    print('Finished all updates at {0}\n\n'.format(now))
