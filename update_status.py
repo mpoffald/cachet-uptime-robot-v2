@@ -17,7 +17,7 @@ class UptimeRobot(object):
         self.base_url = 'https://api.uptimerobot.com/v2/getMonitors'
 
 
-    def get_monitors(self, response_times=1, logs=1, uptime_ratio=30):
+    def get_monitors(self, response_times=1, logs=0, uptime_ratio=30):
         """
         Returns status and response payload for all known monitors.
         """
@@ -49,9 +49,9 @@ class UptimeRobot(object):
 
     
 
-        ##get rsponse and convert to json
+        ##get response and convert to json
         j_content = response.json()
-
+        print('j_content: {0}\n\n\n\n'.format(j_content))
         if j_content.get('stat'):
             stat = j_content.get('stat')
             if stat == 'ok':
@@ -119,27 +119,37 @@ class CachetHq(object):
             return response
         
         print('     No change to status for this component')
-        
 
-    def set_data_metrics(self, data, id_metric=1, is_last_response_time=False):
-
-        url = '{0}/api/v1/metrics/{1}/points'.format(
-            self.cachet_url,
-            id_metric
-        )
+    def format_data(self, monitor, metric_id, metric_type):
+        value = None,
+        timestamp = int(time.time())
         
-        if is_last_response_time: ##rearrange for Cachet
-            value = data.get('value')
-            timestamp = data.get('datetime')
+        if metric_type == 0:
+            raw_data = monitor.get('response_times')[0]
+            value = raw_data.get('value')
+            timestamp = raw_data.get('datetime')
+        elif metric_type == 1:
+            value = monitor.get('average_response_time')
+        elif metric_type == 2:
+            value = monitor.get('custom_uptime_ratio')
         else:
-            value = data
-            timestamp = int(time.time())
+            print('ERROR: Metric type \"{0}\" not supported'.format(metric_type))
+            sys.exit(1)
 
         data = {
             'value': value,
             'timestamp': timestamp,
         }
 
+        return data
+
+    def set_data_metrics(self, data, metric_id):
+
+        url = '{0}/api/v1/metrics/{1}/points'.format(
+            self.cachet_url,
+            metric_id
+        )
+        
         headers={'X-Cachet-Token': self.cachet_api_key}
         
         response = requests.request('POST', url, data=data, headers=headers, auth=(self.authuser, self.authpass))
@@ -198,31 +208,15 @@ class Monitor(object):
             )
         metric_type =int( website_config['metric_type'])
         metric_id = website_config['metric_id']
+
+        data = cachet.format_data(monitor, metric_id, metric_type)
         
-        if metric_type == 0:
-            metric = cachet.set_data_metrics(
-                monitor.get('response_times')[0], 
-                metric_id,
-                True
-            )
-            print('  Metric created: {0}'.format(metric))
-        elif metric_type == 1 :
-            metric = cachet.set_data_metrics(
-                monitor.get('average_response_time'), 
-                metric_id,
-                False
-            )
-            print('  Metric created: {0}'.format(metric))
-        elif metric_type == 2:
-            metric = cachet.set_data_metrics(
-                monitor.get('custom_uptime_ratio'), 
-                metric_id,
-                False
-            )
-            print('  Metric created: {0}'.format(metric))
-        else:
-            print('ERROR: Metric type \"{0}\" not supported'.format(metric_type))
-            
+        
+        metric = cachet.set_data_metrics(data, metric_id)
+       
+        print('  Metric created: {0}'.format(metric))
+       
+        
         
 
 
