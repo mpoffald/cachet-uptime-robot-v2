@@ -51,7 +51,7 @@ class UptimeRobot(object):
 
         ##get response and convert to json
         j_content = response.json()
-        print('j_content: {0}\n\n\n\n'.format(j_content))
+      
         if j_content.get('stat'):
             stat = j_content.get('stat')
             if stat == 'ok':
